@@ -1,0 +1,150 @@
+---
+title: "Predicting RUL - GE"
+output: 
+  flexdashboard::flex_dashboard:
+    theme: spacelab
+    vertical_layout: fill
+    orientation: columns
+runtime: shiny
+
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(shiny)
+library(DT)
+library(dplyr)
+library(plotly)
+library(geosphere)
+```
+
+```{r data}
+
+ge <- read.csv("df.csv", col.names = c("esn",	"distance",	"max_cycle", "rul",
+                                       "mean_X54321P01_op116_median_first",
+                                       "max_nc",	"max_ps30",	"min_p15",
+                                       "min_p30",	"min_ps30"))
+
+variables <- c("distance",	"max_cycle",                          "mean_X54321P01_op116_median_first",                                      "max_nc",	"max_ps30",	"min_p15",                                       "min_p30",	"min_ps30")
+
+```
+
+Column {.sidebar data-width=150}
+-----------------------------------------------------------------
+
+```{r inputs}
+
+selectInput("variable_choice", label = h5("Choose one or more input variables"), 
+            choices = variables, variables[1], multiple = TRUE)
+
+
+```
+
+
+```{r reactive expression}
+
+model1 <- reactive({
+  vars <- as.matrix(ge[, input$variable_choice])
+  lm(rul ~ vars, data = ge)
+  
+})
+
+```
+
+Column {data-width=500}
+-----------------------------------------------------------------------
+
+###
+
+```{r model output}
+renderPrint({ 
+   
+summary(model1())
+
+})
+```
+
+###
+
+```{r table}
+DT::renderDataTable({
+
+ DT::datatable(ge %>% mutate(predicted = predict(model1()), residuals = residuals(model1())) %>% select(esn, rul, predicted, residuals), 
+ rownames = FALSE, colnames = c('esn','actual rul', 'predicted rul', 'difference'), extensions = c('Buttons', 'Responsive'), 
+ options = list(columnDefs = list(list(className = 'dt-center', targets = "_all")), dom = 'Blfrt', 
+ buttons = c('copy', 'csv', 'excel', 'print'), searching = FALSE, lengthMenu = c(20, 100), scrollY = 300, scrollCollapse = TRUE))
+ 
+})
+
+```
+
+Column {data-width=300}
+-----------------------------------------------------------------------
+
+###
+
+```{r scatter}
+renderPlotly({
+
+plot_ly(data = ge, y = ~predict(model1()), x = ~rul,
+               type = "scatter", mode = "markers",
+               marker = list(size = 5,
+                             color = '#FFFFFF',
+                             line = list(color = '#EA6345', 
+                                         width = 2))) %>% 
+  layout(title = '',
+         yaxis = list(zeroline = FALSE, title = "predicted rul", titlefont = list(
+  family = "Lucida Console, Courier New, monospace", size = 12, color = "#FFFFFF"), tickfont = list(
+  family = "Lucida Console, Courier New, monospace", size = 10, color = "#FFFFFF"), color =  "white", size = 2),
+         xaxis = list(zeroline = FALSE, title = "actual rul", titlefont = list(
+  family = "Lucida Console, Courier New, monospace", size = 12, color = "#FFFFFF"), tickfont = list(
+  family = "Lucida Console, Courier New, monospace", size = 10, color = "#FFFFFF"), color =  "white", size = 7)) %>%
+  layout(plot_bgcolor='#678EB9', paper_bgcolor='#678EB9')
+
+  
+})
+
+```
+
+###
+
+```{r histogram}
+renderPlotly({
+  
+
+plot_ly(ge, x = ~round(residuals(model1()),2), type = "histogram", marker = list(color = "#EA6345",
+                            line = list(color = "#FFFFFF", width = 1))) %>%   layout(title = '',
+         yaxis = list(zeroline = FALSE, title = "frequency",  titlefont = list(
+  family = "Lucida Console, Courier New, monospace", size = 12, color = "#FFFFFF"), 
+  tickfont = list(
+  family = "Lucida Console, Courier New, monospace", size = 10, color = "#FFFFFF"), color =  "white"),
+         xaxis = list(zeroline = FALSE, title = "residual",  titlefont = list(
+  family = "Lucida Console, Courier New, monospace", size = 12, color = "#FFFFFF"), 
+  tickfont = list(
+  family = "Lucida Console, Courier New, monospace", size = 10, color = "#FFFFFF"), color =  "white")) %>%
+  layout(plot_bgcolor='#678EB9', paper_bgcolor='#678EB9')
+
+
+})
+
+```
+
+
+```{css}
+
+.dt-center {
+  background-color: #678EB9;
+  color: #FFFFFF;
+  font-family: "Lucida Console", "Courier New", monospace; 
+  font-size: 12px;
+}
+
+#section-section .shiny-bound-output {
+  background-color: #678EB9;
+  color: #FFFFFF;
+  font-family: "Lucida Console", "Courier New", monospace; 
+  font-size: 12px;
+}
+
+
+```
